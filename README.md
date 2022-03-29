@@ -32,10 +32,6 @@ Otherwise, you should configure your environment manually by the following steps
         ```bash
         composer install
         ```
-    - Generate the project key using the following artisan command:
-        ```bash
-        php artisan key:generate
-        ```
     - Migrate the database tables and dummy data:
         ```bash
         php artisan migrate --seed
