@@ -46,9 +46,3 @@ Otherwise, you should configure your environment manually by the following steps
         php artisan serve
         ```
     - Go to your browser and visit: [http://localhost:8000](http://localhost:8000)
-        - Default Admin  Credentials:
-            - **Email:** admin@demo.com
-            - **Password:** password
-
-### TODO
-- Add `notifications` management.
