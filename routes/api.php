@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::group(['middleware' => ['checkKey', 'AllowCorsPolicy']], function() {
+Route::group(['middleware' => ['AllowCorsPolicy', 'checkKey']], function() {
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
 

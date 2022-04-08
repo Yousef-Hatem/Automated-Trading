@@ -159,7 +159,7 @@ class OrderController extends Controller
                                             'earning' => number_format(($user->size * $order['selling_price']) - ($user->size * $order['price']), 4, '.', ''),
                                             'size' => $user->size,
                                             'selling_price' => $order['selling_price'],
-                                            'date' => $order['sold_at']
+                                            'date' => gmdate("Y-m-d h:i:s", strtotime($order['sold_at']) + 3600*(7+date("I")))
                                         ];
 
                                         array_push($symbol['grids'], $grid);
@@ -193,7 +193,7 @@ class OrderController extends Controller
                                 'price' => $order['price'],
                                 'size' => $user->size,
                                 'amount_buy' => $user->size * $order['price'],
-                                'date' => $order['created_at']
+                                'date' => gmdate("Y-m-d h:i:s", strtotime($order['created_at']) + 3600*(7+date("I")))
                             ];
 
                             array_push($symbols, $openTrade);
