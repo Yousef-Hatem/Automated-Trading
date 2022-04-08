@@ -1,8 +1,7 @@
-# Automated-Trading
-## Laravel Scaffolding
+# Laravel Automated-Trading
 The laravel scaffolding of our projects.
 
-### Deploying To Local Server
+## Deploying To Local Server
 If you use valet just execute the `init.sh` file to configure your environment automatically.
 ```bash
 git clone https://github.com/Yousef-Hatem/Automated-Trading.git Automated-Trading
@@ -33,10 +32,6 @@ Otherwise, you should configure your environment manually by the following steps
         ```bash
         composer install
         ```
-    - Generate the project key using the following artisan command:
-        ```bash
-        php artisan key:generate
-        ```
     - Migrate the database tables and dummy data:
         ```bash
         php artisan migrate --seed
@@ -47,9 +42,3 @@ Otherwise, you should configure your environment manually by the following steps
         php artisan serve
         ```
     - Go to your browser and visit: [http://localhost:8000](http://localhost:8000)
-        - Default Admin  Credentials:
-            - **Email:** admin@demo.com
-            - **Password:** password
-
-### TODO
-- Add `notifications` management.
