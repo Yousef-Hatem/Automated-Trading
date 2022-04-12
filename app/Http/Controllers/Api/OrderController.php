@@ -25,7 +25,7 @@ class OrderController extends Controller
 
     public function trades()
     {
-        $orders = Order::where('sold_at', null)->select('id', 'symbol', 'grid', 'price', 'users', 'msg_id', 'created_at')->get();
+        $orders = Order::where('sold_at', null)->select('id', 'symbol', 'price', 'users', 'msg_id', 'created_at')->get();
 
         return response()->json(['status' => true, 'data' => $orders], 200);
     }
@@ -52,9 +52,27 @@ class OrderController extends Controller
             return response()->json(['status' => false, 'code' => 400, 'error' => $validator->errors()->first()], 400);
         }
 
-        $order['grid'] = Order::where('symbol', $order['symbol'])->where('sold_at', null)->reorder('grid', 'desc')->pluck('grid')->first() ?? 0;
+        $trades = Order::where('symbol', $order['symbol'])->where('sold_at', null)->get();
 
-        $order['grid']++;
+        for ($i=0; $i < count($order['users']); $i++)
+        {
+            $user = $order['users'][$i];
+            $user['grid'] = 1;
+
+            foreach ($trades as $trade)
+            {
+                $tradeUsers = json_decode($trade->users);
+
+                foreach ($tradeUsers as $tradeUser)
+                {
+                    if ($tradeUser->username === $user['username']) {
+                        $user['grid']++;
+                    }
+                }
+            }
+
+            $order['users'][$i] = $user;
+        }
 
         $order['users'] = json_encode($order['users']);
 
@@ -86,14 +104,14 @@ class OrderController extends Controller
 
         $order->selling_price = $request->price;
 
-        $order->sold_at = date("Y:m:d h:i:s");
+        $order->sold_at = date("Y:m:d H:i:s");
 
         $order->save();
 
         return response()->json(['status' => true, 'data' => $order], 204);
     }
 
-    public function report(Request $request)
+    public function report(Request $request, $username = null)
     {
         if (!isset($request->all()['type'])) {
             return response()->json(['status' => false, 'code' => 400, 'error' => 'The type field is required.'], 400);
@@ -102,9 +120,9 @@ class OrderController extends Controller
         $type = $request->all()['type'];
 
         if ($type == "sell") {
-            $orders = Order::where('sold_at', '!=', null)->get();
+            $orders = Order::where('sold_at', '!=', null)->reorder('sold_at', 'asc')->get();
         } elseif ($type == "buy") {
-            $orders = Order::where('sold_at', null)->select('id', 'symbol', 'grid', 'price', 'users', 'msg_id', 'created_at')->get();
+            $orders = Order::where('sold_at', null)->select('id', 'symbol', 'price', 'users', 'msg_id', 'created_at')->reorder('created_at', 'asc')->get();
         } else {
             return response()->json(['status' => false, 'code' => 400, 'error' => "This type is not defined. You can send 'sell' or 'buy'"], 400);
         }
@@ -118,7 +136,9 @@ class OrderController extends Controller
                 $i = array_search($user->username, $users, true);
 
                 if (!($i === 0 || $i > 0)) {
-                    array_push($users, $user->username);
+                    if (!isset($username) || $username == $user->username) {
+                        array_push($users, $user->username);
+                    }
                 }
             }
         }
@@ -155,11 +175,11 @@ class OrderController extends Controller
                                     if ($username == $user->username && $symbol['symbol'] == $order['symbol'])
                                     {
                                         $grid = [
-                                            'grid' => $order['grid'],
+                                            'grid' => $user->grid,
                                             'earning' => number_format(($user->size * $order['selling_price']) - ($user->size * $order['price']), 4, '.', ''),
                                             'size' => $user->size,
                                             'selling_price' => $order['selling_price'],
-                                            'date' => gmdate("Y-m-d h:i:s", strtotime($order['sold_at']) + 3600*(7+date("I")))
+                                            'date' => gmdate("Y-m-d h:i:sA", strtotime($order['sold_at']) + 3600*(7+date("I")))
                                         ];
 
                                         array_push($symbol['grids'], $grid);
@@ -189,11 +209,11 @@ class OrderController extends Controller
                         {
                             $openTrade = [
                                 'symbol' => $order['symbol'],
-                                'grid' => $order['grid'],
+                                'grid' => $user->grid,
                                 'price' => $order['price'],
                                 'size' => $user->size,
                                 'amount_buy' => $user->size * $order['price'],
-                                'date' => gmdate("Y-m-d h:i:s", strtotime($order['created_at']) + 3600*(7+date("I")))
+                                'date' => gmdate("Y-m-d h:i:sA", strtotime($order['created_at']) + 3600*(7+date("I")))
                             ];
 
                             array_push($symbols, $openTrade);

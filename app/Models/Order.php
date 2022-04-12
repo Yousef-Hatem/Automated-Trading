@@ -16,7 +16,6 @@ class Order extends Model
      */
     protected $fillable = [
         'symbol',
-        'grid',
         'price',
         'users',
         'msg_id',

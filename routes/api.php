@@ -35,5 +35,6 @@ Route::group(['middleware' => ['AllowCorsPolicy', 'checkKey']], function() {
     Route::put('/reply-to-message/{replyToMessage}', [SettingsController::class, 'editReplyToMessage']);
 
     Route::get('/report', [OrderController::class, 'report']);
+    Route::get('/report/{username}', [OrderController::class, 'report']);
 });
 
