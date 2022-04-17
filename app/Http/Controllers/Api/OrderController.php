@@ -25,7 +25,7 @@ class OrderController extends Controller
 
     public function trades()
     {
-        $orders = Order::where('sold_at', null)->select('id', 'symbol', 'price', 'users', 'msg_id', 'created_at')->get();
+        $orders = Order::where('sold_at', null)->get();
 
         return response()->json(['status' => true, 'data' => $orders], 200);
     }
@@ -42,10 +42,14 @@ class OrderController extends Controller
         $order = $request->all();
 
         $validator = Validator::make($order, [
-            'symbol' => 'required|max:15|min:4',
-            'price' => 'required|numeric',
+            'symbol' => 'required',
             'users' => 'required|array',
-            'msg_id' => 'required|numeric',
+            'users.*' => 'required|array',
+            'users.*.username' => 'required|string',
+            'users.*.price' => 'required|numeric',
+            'users.*.size' => 'required|numeric',
+            'users.*.fee' => 'required|numeric',
+            'users.*.created_at' => 'required'
         ]);
 
         if ($validator->fails()) {
@@ -54,29 +58,19 @@ class OrderController extends Controller
 
         $trades = Order::where('symbol', $order['symbol'])->where('sold_at', null)->get();
 
-        for ($i=0; $i < count($order['users']); $i++)
-        {
-            $user = $order['users'][$i];
+        foreach ($order['users'] as $user) {
+            $user['symbol'] = $order['symbol'];
             $user['grid'] = 1;
 
             foreach ($trades as $trade)
             {
-                $tradeUsers = json_decode($trade->users);
-
-                foreach ($tradeUsers as $tradeUser)
-                {
-                    if ($tradeUser->username === $user['username']) {
-                        $user['grid']++;
-                    }
+                if ($trade->username === $user['username']) {
+                    $user['grid']++;
                 }
             }
 
-            $order['users'][$i] = $user;
+            $order = Order::create($user);
         }
-
-        $order['users'] = json_encode($order['users']);
-
-        $order = Order::create($order);
 
         return response()->json(['status' => true, 'data' => $order], 201);
     }
@@ -89,7 +83,9 @@ class OrderController extends Controller
 
         $validator = Validator::make($order, [
             'id' => 'required|numeric',
-            'price' => 'required|numeric'
+            'price' => 'required|numeric',
+            'fee' => 'required|numeric',
+            'sold_at' => 'required|numeric'
         ]);
 
         if ($validator->fails()) {
@@ -103,8 +99,8 @@ class OrderController extends Controller
         }
 
         $order->selling_price = $request->price;
-
-        $order->sold_at = date("Y:m:d H:i:s");
+        $order->selling_fee = $request->fee;
+        $order->sold_at = date('Y-m-d H:i:s', $request->sold_at);
 
         $order->save();
 
@@ -122,30 +118,27 @@ class OrderController extends Controller
         if ($type == "sell") {
             $orders = Order::where('sold_at', '!=', null)->reorder('sold_at', 'asc')->get();
         } elseif ($type == "buy") {
-            $orders = Order::where('sold_at', null)->select('id', 'symbol', 'price', 'users', 'msg_id', 'created_at')->reorder('created_at', 'asc')->get();
+            $orders = Order::where('sold_at', null)->reorder('created_at', 'asc')->get();
         } else {
             return response()->json(['status' => false, 'code' => 400, 'error' => "This type is not defined. You can send 'sell' or 'buy'"], 400);
         }
 
-        $users = [];
+        $usersnames = [];
 
         foreach ($orders as $order)
         {
-            foreach (json_decode($order['users']) as $user)
-            {
-                $i = array_search($user->username, $users, true);
+            $i = array_search($order->username, $usersnames, true);
 
-                if (!($i === 0 || $i > 0)) {
-                    if (!isset($username) || $username == $user->username) {
-                        array_push($users, $user->username);
-                    }
+            if (!($i === 0 || $i > 0)) {
+                if (!isset($username) || $username == $order->username) {
+                    array_push($usersnames, $order->username);
                 }
             }
         }
 
         $report = [];
 
-        foreach ($users as $username) {
+        foreach ($usersnames as $username) {
             $total_profits = 0;
             $currencies = [];
             $symbols = [];
@@ -154,47 +147,63 @@ class OrderController extends Controller
             {
                 foreach ($orders as $order)
                 {
-                    foreach (json_decode($order['users']) as $user)
+                    $i = array_search($order->symbol, $currencies, true);
+
+                    if ($username == $order->username && !($i === 0 || $i > 0))
                     {
-                        $i = array_search($order['symbol'], $currencies, true);
+                        array_push($currencies, $order->symbol);
 
-                        if ($username == $user->username && !($i === 0 || $i > 0))
+                        $symbol = [
+                            'symbol' => $order->symbol,
+                            'total_profits' => 0,
+                            'grids' => [],
+                        ];
+
+                        foreach ($orders as $order)
                         {
-                            array_push($currencies, $order['symbol']);
-
-                            $symbol = [
-                                'symbol' => $order['symbol'],
-                                'total_profits' => 0,
-                                'grids' => [],
-                            ];
-
-                            foreach ($orders as $order)
+                            if ($username == $order->username && $symbol['symbol'] == $order->symbol)
                             {
-                                foreach (json_decode($order['users']) as $user)
-                                {
-                                    if ($username == $user->username && $symbol['symbol'] == $order['symbol'])
-                                    {
-                                        $grid = [
-                                            'grid' => $user->grid,
-                                            'earning' => number_format(($user->size * $order['selling_price']) - ($user->size * $order['price']), 4, '.', ''),
-                                            'size' => $user->size,
-                                            'selling_price' => $order['selling_price'],
-                                            'date' => gmdate("Y-m-d h:i:sA", strtotime($order['sold_at']) + 3600*(7+date("I")))
-                                        ];
+                                $accuracyOfData = "High";
 
-                                        array_push($symbol['grids'], $grid);
-
-                                        $symbol['total_profits'] += $grid['earning'];
-                                    }
+                                if ($order->fee === null) {
+                                    $order->fee = 0;
+                                    $accuracyOfData = "Low";
                                 }
+
+                                $grid = [
+                                    'grid' => $order->grid,
+                                    'earning' => number_format((($order->size - $order->fee) * $order->selling_price) - ($order->size * $order->price), 4, '.', ''),
+                                    'size' => $order->size - $order->fee,
+                                    'selling_price' => number_format($order->selling_price, 8),
+                                    'fee' => $order->selling_fee,
+                                    'sold_at' => gmdate("Y-m-d h:i:sA", strtotime($order->sold_at) + 3600*(7+date("I"))),
+                                    'accuracy_of_data' => $accuracyOfData
+                                ];
+
+                                if ($order->selling_price == 0) {
+                                    $grid = [
+                                        'grid' => $order->grid,
+                                        'earning' => null,
+                                        'size' => $order->size - $order->fee,
+                                        'selling_price' => null,
+                                        'fee' => null,
+                                        'sold_at' => null,
+                                        'accuracy_of_data' => $accuracyOfData,
+                                        'message' => 'The user has already sold this deal by hand'
+                                    ];
+                                }
+
+                                array_push($symbol['grids'], $grid);
+
+                                $symbol['total_profits'] += $grid['earning'];
                             }
-
-                            $symbol['total_profits'] = number_format($symbol['total_profits'], 4, '.', '');
-
-                            array_push($symbols, $symbol);
-
-                            $total_profits += $symbol['total_profits'];
                         }
+
+                        $symbol['total_profits'] = number_format($symbol['total_profits'], 4, '.', '');
+
+                        array_push($symbols, $symbol);
+
+                        $total_profits += $symbol['total_profits'];
                     }
                 }
             }
@@ -203,21 +212,27 @@ class OrderController extends Controller
             {
                 foreach ($orders as $order)
                 {
-                    foreach (json_decode($order['users']) as $user)
+                    if ($username == $order->username)
                     {
-                        if ($username == $user->username)
-                        {
-                            $openTrade = [
-                                'symbol' => $order['symbol'],
-                                'grid' => $user->grid,
-                                'price' => $order['price'],
-                                'size' => $user->size,
-                                'amount_buy' => $user->size * $order['price'],
-                                'date' => gmdate("Y-m-d h:i:sA", strtotime($order['created_at']) + 3600*(7+date("I")))
-                            ];
+                        $accuracyOfData = "High";
 
-                            array_push($symbols, $openTrade);
+                        if ($order->fee === null) {
+                            $order->fee = 0;
+                            $accuracyOfData = "Low";
                         }
+
+                        $openTrade = [
+                            'symbol' => $order->symbol,
+                            'grid' => $order->grid,
+                            'price' => number_format($order->price, 8),
+                            'size' => $order->size,
+                            'fee' => $order->fee,
+                            'amount_buy' => $order->size * $order['price'],
+                            'created_at' => gmdate("Y-m-d h:i:sA", strtotime($order->created_at) + 3600*(7+date("I"))),
+                            'accuracy_of_data' => $accuracyOfData
+                        ];
+
+                        array_push($symbols, $openTrade);
                     }
                 }
             }

@@ -15,12 +15,16 @@ class Order extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'username',
         'symbol',
+        'grid',
+        'size',
         'price',
-        'users',
-        'msg_id',
+        'fee',
         'selling_price',
+        'selling_fee',
         'sold_at',
+        'created_at'
     ];
 
     /**
@@ -28,7 +32,5 @@ class Order extends Model
      *
      * @var array<int, string>
      */
-    protected $hidden = [
-        'updated_at',
-    ];
+    protected $hidden = [];
 }
