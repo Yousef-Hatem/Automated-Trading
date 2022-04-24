@@ -46,6 +46,7 @@ class OrderController extends Controller
             'users' => 'required|array',
             'users.*' => 'required|array',
             'users.*.username' => 'required|string',
+            'users.*.orderId' => 'required|numeric',
             'users.*.price' => 'required|numeric',
             'users.*.size' => 'required|numeric',
             'users.*.fee' => 'required|numeric',
@@ -83,6 +84,7 @@ class OrderController extends Controller
 
         $validator = Validator::make($order, [
             'id' => 'required|numeric',
+            'orderId' => 'required|numeric',
             'price' => 'required|numeric',
             'fee' => 'required|numeric',
             'sold_at' => 'required|numeric'
@@ -98,6 +100,7 @@ class OrderController extends Controller
             return response()->json(['status' => false, 'code' => 400, 'error' => 'This order is already sold out'], 400);
         }
 
+        $order->sell_orderId = $request->orderId;
         $order->selling_price = $request->price;
         $order->selling_fee = $request->fee;
         $order->sold_at = date('Y-m-d H:i:s', $request->sold_at);
@@ -171,6 +174,8 @@ class OrderController extends Controller
                                 }
 
                                 $grid = [
+                                    'id' => $order->id,
+                                    'binance_orderId' => $order->sell_orderId,
                                     'grid' => $order->grid,
                                     'earning' => number_format((($order->size - $order->fee) * $order->selling_price) - ($order->size * $order->price), 4, '.', ''),
                                     'size' => $order->size - $order->fee,
@@ -182,6 +187,8 @@ class OrderController extends Controller
 
                                 if ($order->selling_price == 0) {
                                     $grid = [
+                                        'id' => $order->id,
+                                        'binance_orderId' => null,
                                         'grid' => $order->grid,
                                         'earning' => null,
                                         'size' => $order->size - $order->fee,
@@ -222,6 +229,8 @@ class OrderController extends Controller
                         }
 
                         $openTrade = [
+                            'id' => $order->id,
+                            'binance_orderId' => $order->orderId,
                             'symbol' => $order->symbol,
                             'grid' => $order->grid,
                             'price' => number_format($order->price, 8),

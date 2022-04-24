@@ -16,11 +16,13 @@ class Order extends Model
      */
     protected $fillable = [
         'username',
+        'orderId',
         'symbol',
         'grid',
         'size',
         'price',
         'fee',
+        'sell_orderId',
         'selling_price',
         'selling_fee',
         'sold_at',
